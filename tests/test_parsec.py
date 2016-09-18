@@ -11,6 +11,9 @@ from parsec import *
 
 import random
 import unittest
+import functools
+
+from pymonad.Reader import curry
 
 class ParsecTest(unittest.TestCase):
     '''Test the implementation of Text.Parsec. (The final test for all apis)'''
@@ -44,6 +47,24 @@ class ParsecTest(unittest.TestCase):
         self.assertRaises(ParseError, parser.parse, 'xyzw')
         self.assertRaises(ParseError, parser.parse, 'xyzwv1')
         self.assertRaises(ParseError, parser.parse, 'x1')
+
+    def test_unit(self):
+        value, text = unit('x').parse_partial('abc')
+        self.assertEqual(value, 'x')
+        self.assertEqual(text, 'abc')
+
+    def test_amap(self):
+        parser = (unit(curry(lambda x, y: x + y))
+                  & digit().parsecmap(int)
+                  & digit().parsecmap(int))
+        self.assertEquals(parser.parse('58'), 13)
+
+        @curry
+        def max_(x, y):
+            return max(x, y)
+
+        parser = unit(max_) & digit().parsecmap(int) & digit().parsecmap(int)
+        self.assertEquals(parser.parse('58'), 8)
 
 class ParsecPrimTest(unittest.TestCase):
     '''Test the implementation of Text.Parsec.Prim.'''

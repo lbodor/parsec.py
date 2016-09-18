@@ -10,6 +10,8 @@ __author__ = 'He Tao, sighingnow@gmail.com'
 import re
 from functools import wraps
 from collections import namedtuple
+from pymonad.Functor import Functor
+# from pymonad.Applicative import Applicative
 
 ##########################################################################
 ## Text.Parsec.Error
@@ -67,7 +69,7 @@ class Value(namedtuple('Value', 'status index value expected')):
         if not other.status:
             return other
         return Value(True, other.index, self.value+other.value, None)
-    
+
     @staticmethod
     def combinate(values):
         '''aggregate multiple values into tuple'''
@@ -108,6 +110,21 @@ class Parser(object):
     def parse(self, text):
         '''Parser a given string `text`.'''
         return self.parse_partial(text)[0]
+
+    def fmap(self, fn):
+        @Parser
+        def p(text, index=0):
+            res = self(text, index)
+            return Value.success(res.index, fn(res.value))
+        return p;
+
+    def amap(self, pa):
+        @Parser
+        def p(text, index=0):
+            fn_res = self(text, index)
+            pa_res = pa(text, fn_res.index)
+            return Value.success(pa_res.index, fn_res.value(pa_res.value))
+        return p
 
     def parse_partial(self, text):
         '''Parse the longest possible prefix of a given string.
@@ -261,9 +278,16 @@ class Parser(object):
         '''Implements the `(<)` operator, means `skip`.'''
         return self.ends_with(other)
 
+    def __and__(self, other):
+        '''Implements the `(&)` operator, means `amap`.'''
+        return self.amap(other)
+
 def parse(p, text, index):
     '''Parse a string and return the result or raise a ParseError.'''
     return p.parse(text, index)
+
+def unit(a):
+    return Parser(lambda _, index: Value.success(index, a))
 
 def bind(p, fn):
     '''Bind two parsers, implements the operator of `(>>=)`.'''
